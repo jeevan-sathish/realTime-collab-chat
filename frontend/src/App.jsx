@@ -1,121 +1,103 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import heroImg from './assets/hero.png'
-import './App.css'
+import { useState, useRef, useEffect } from "react";
 
 function App() {
-  const [count, setCount] = useState(0)
+  const [room, setRoom] = useState("");
+  const [socket, setSocket] = useState(null);
+  const [msg, setMsg] = useState("");
+  const [messages, setMessages] = useState([]);
+  const bottomRef = useRef(null);
+
+  // 🔽 Auto scroll
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  // ✅ Create Room
+  const createRoom = async () => {
+    const res = await fetch("http://localhost:8000/create-room");
+    const data = await res.json();
+    setRoom(data.room_id);
+    alert("Room ID: " + data.room_id);
+  };
+
+  // ✅ Join Room
+  const joinRoom = () => {
+    if (!room) return alert("Enter Room ID");
+
+    // close old socket if exists
+    if (socket) socket.close();
+
+    const ws = new WebSocket(`ws://127.0.0.1:8000/ws/${room}`);
+
+    ws.onopen = () => {
+      console.log("Connected ✅");
+    };
+
+    ws.onmessage = (event) => {
+      setMessages((prev) => [...prev, "Friend: " + event.data]);
+    };
+
+    ws.onerror = () => {
+      alert("Connection error ❌");
+    };
+
+    ws.onclose = () => {
+      console.log("Disconnected ❌");
+    };
+
+    setSocket(ws);
+  };
+
+  // ✅ Send Message
+  const sendMessage = () => {
+    if (!socket || socket.readyState !== WebSocket.OPEN) {
+      return alert("Not connected ❌");
+    }
+
+    socket.send(msg);
+    setMessages((prev) => [...prev, "You: " + msg]);
+    setMsg("");
+  };
+
+  // cleanup
+  useEffect(() => {
+    return () => socket?.close();
+  }, [socket]);
 
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.jsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
+    <div style={{ padding: 20 }}>
+      <h2>2 User Chat 💬</h2>
 
-      <div className="ticks"></div>
+      <button onClick={createRoom}>Create Room</button>
 
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
+      <br />
+      <br />
 
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
-  )
+      <input
+        placeholder="Enter Room ID"
+        value={room}
+        onChange={(e) => setRoom(e.target.value)}
+      />
+      <button onClick={joinRoom}>Join Room</button>
+
+      <br />
+      <br />
+
+      <input
+        placeholder="Message"
+        value={msg}
+        onChange={(e) => setMsg(e.target.value)}
+      />
+      <button onClick={sendMessage}>Send</button>
+
+      <ul style={{ height: 200, overflowY: "auto" }}>
+        {messages.map((m, i) => (
+          <li key={i}>{m}</li>
+        ))}
+        <div ref={bottomRef} />
+      </ul>
+    </div>
+  );
 }
 
-export default App
+export default App;
